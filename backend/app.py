@@ -5,6 +5,7 @@ from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from datetime import datetime, timedelta
+import json
 
 app = Flask(__name__)
 CORS(app)
@@ -18,6 +19,19 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
+
+# ERROR HANDLERS - Always return JSON
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({"error": "Endpoint not found"}), 404
+
+@app.errorhandler(500)
+def server_error(e):
+    return jsonify({"error": "Internal server error"}), 500
+
+@app.errorhandler(Exception)
+def handle_error(e):
+    return jsonify({"error": str(e)}), 500
 
 # MODELS
 class User(db.Model):
@@ -66,58 +80,84 @@ def api_health():
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    user = User.query.filter_by(email=data.get('email')).first()
-    
-    if user and bcrypt.check_password_hash(user.password, data.get('password')):
-        if user.status != 'active':
-            return jsonify({"msg": f"Access Denied: Account {user.status}"}), 403
-            
-        access_token = create_access_token(identity=str(user.id))
-        return jsonify({
-            "token": access_token,
-            "role": user.role,
-            "email": user.email,
-            "uid": user.id
-        }), 200
+    try:
+        data = request.get_json() or {}
+        email = data.get('email')
+        password = data.get('password')
+        if not email or not password:
+            return jsonify({"msg": "Email and password required"}), 400
+        user = User.query.filter_by(email=email).first()
         
-    return jsonify({"msg": "Invalid credentials"}), 401
+        if user and bcrypt.check_password_hash(user.password, password):
+            if user.status != 'active':
+                return jsonify({"msg": f"Access Denied: Account {user.status}"}), 403
+                
+            access_token = create_access_token(identity=str(user.id))
+            return jsonify({
+                "token": access_token,
+                "role": user.role,
+                "email": user.email,
+                "uid": user.id
+            }), 200
+            
+        return jsonify({"msg": "Invalid credentials"}), 401
+    except Exception as e:
+        print(f"Login error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/users', methods=['GET'])
 @jwt_required()
 def get_users():
-    users = User.query.all()
-    return jsonify([{
-        "id": u.id, "email": u.email, "role": u.role, 
-        "status": u.status, "created_at": u.created_at
-    } for u in users])
+    try:
+        users = User.query.all()
+        return jsonify([{
+            "id": u.id, "email": u.email, "role": u.role, 
+            "status": u.status, "created_at": str(u.created_at)
+        } for u in users]), 200
+    except Exception as e:
+        print(f"Error getting users: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/users', methods=['POST'])
 @jwt_required()
 def add_user():
-    data = request.get_json()
-    if User.query.filter_by(email=data.get('email')).first():
-        return jsonify({"msg": "User already exists"}), 400
-        
-    hashed_pw = bcrypt.generate_password_hash(data.get('password')).decode('utf-8')
-    new_user = User(
-        email=data.get('email'), 
-        password=hashed_pw, 
-        role=data.get('role', 'staff'),
-        status='active'
-    )
-    db.session.add(new_user)
-    db.session.commit()
-    return jsonify({"msg": "User created"}), 201
+    try:
+        data = request.get_json() or {}
+        email = data.get('email')
+        password = data.get('password')
+        if not email or not password:
+            return jsonify({"msg": "Email and password required"}), 400
+        if User.query.filter_by(email=email).first():
+            return jsonify({"msg": "User already exists"}), 400
+            
+        hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
+        new_user = User(
+            email=email, 
+            password=hashed_pw, 
+            role=data.get('role', 'staff'),
+            status='active'
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        return jsonify({"msg": "User created"}), 201
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error adding user: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/users/<int:user_id>', methods=['PATCH'])
 @jwt_required()
 def update_user(user_id):
-    data = request.get_json()
-    user = User.query.get_or_404(user_id)
-    if 'status' in data: user.status = data['status']
-    db.session.commit()
-    return jsonify({"msg": "User updated"})
+    try:
+        data = request.get_json() or {}
+        user = User.query.get_or_404(user_id)
+        if 'status' in data: user.status = data['status']
+        db.session.commit()
+        return jsonify({"msg": "User updated"}), 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating user: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/products', methods=['GET'])
 def get_products():
@@ -137,61 +177,90 @@ def get_products():
 @app.route('/api/products', methods=['POST'])
 @jwt_required()
 def add_product():
-    data = request.get_json()
-    import json
-    new_p = Product(
-        name=data.get('name'),
-        price=data.get('price'),
-        image=data.get('image'),
-        sizes=json.dumps(data.get('sizes'))
-    )
-    db.session.add(new_p)
-    db.session.commit()
-    return jsonify({"msg": "Product added", "id": new_p.id}), 201
+    try:
+        data = request.get_json() or {}
+        name = data.get('name')
+        price = data.get('price')
+        if not name or price is None:
+            return jsonify({"msg": "Name and price required"}), 400
+        new_p = Product(
+            name=name,
+            price=float(price),
+            image=data.get('image', ''),
+            sizes=json.dumps(data.get('sizes', {"6": 0, "7": 0, "8": 0, "9": 0, "10": 0}))
+        )
+        db.session.add(new_p)
+        db.session.commit()
+        return jsonify({"msg": "Product added", "id": new_p.id}), 201
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error adding product: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/products/<int:p_id>', methods=['PATCH'])
 @jwt_required()
 def update_product(p_id):
-    data = request.get_json()
-    p = Product.query.get_or_404(p_id)
-    import json
-    if 'name' in data: p.name = data['name']
-    if 'price' in data: p.price = data['price']
-    if 'image' in data: p.image = data['image']
-    if 'sizes' in data: p.sizes = json.dumps(data['sizes'])
-    if 'totalSold' in data: p.total_sold = data['totalSold']
-    if 'last_sold_date' in data: p.last_sold_date = datetime.utcnow()
-    db.session.commit()
-    return jsonify({"msg": "Product updated"})
+    try:
+        data = request.get_json() or {}
+        p = Product.query.get_or_404(p_id)
+        if 'name' in data: p.name = data['name']
+        if 'price' in data: p.price = float(data['price'])
+        if 'image' in data: p.image = data['image']
+        if 'sizes' in data: p.sizes = json.dumps(data['sizes'])
+        if 'totalSold' in data: p.total_sold = data['totalSold']
+        if 'last_sold_date' in data: p.last_sold_date = datetime.utcnow()
+        db.session.commit()
+        return jsonify({"msg": "Product updated"}), 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating product: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/products/<int:p_id>', methods=['DELETE'])
 @jwt_required()
 def delete_product(p_id):
-    p = Product.query.get_or_404(p_id)
-    db.session.delete(p)
-    db.session.commit()
-    return jsonify({"msg": "Product deleted"})
+    try:
+        p = Product.query.get_or_404(p_id)
+        db.session.delete(p)
+        db.session.commit()
+        return jsonify({"msg": "Product deleted"}), 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error deleting product: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/attendance', methods=['GET'])
 @jwt_required()
 def get_attendance():
-    logs = Attendance.query.all()
-    return jsonify([{
-        "id": l.id, "email": l.email, "date": l.date, "status": l.status
-    } for l in logs])
+    try:
+        logs = Attendance.query.all()
+        return jsonify([{
+            "id": l.id, "email": l.email, "date": str(l.date), "status": l.status
+        } for l in logs]), 200
+    except Exception as e:
+        print(f"Error getting attendance: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/attendance', methods=['POST'])
 @jwt_required()
 def mark_attendance():
-    data = request.get_json()
-    new_a = Attendance(
-        user_id=data.get('userId'),
-        email=data.get('email'),
-        status=data.get('status', 'present')
-    )
-    db.session.add(new_a)
-    db.session.commit()
-    return jsonify({"msg": "Attendance marked"}), 201
+    try:
+        data = request.get_json() or {}
+        email = data.get('email')
+        if not email:
+            return jsonify({"msg": "Email required"}), 400
+        new_a = Attendance(
+            user_id=data.get('userId'),
+            email=email,
+            status=data.get('status', 'present')
+        )
+        db.session.add(new_a)
+        db.session.commit()
+        return jsonify({"msg": "Attendance marked"}), 201
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error marking attendance: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
