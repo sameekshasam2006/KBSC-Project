@@ -8,6 +8,19 @@ const getHeaders = () => {
     };
 };
 
+const safeParseJson = async (res) => {
+    try {
+        const text = await res.text();
+        if (!text) {
+            return res.ok ? {} : { error: res.statusText || "Empty response" };
+        }
+        return JSON.parse(text);
+    } catch (e) {
+        console.error("JSON Parse Error:", e.message, "Response status:", res.status);
+        return { error: "Invalid JSON response from server" };
+    }
+};
+
 export const api = {
     // AUTH
     login: async (email, password) => {
@@ -16,17 +29,19 @@ export const api = {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, password })
         });
+        const data = await safeParseJson(res);
         if (!res.ok) {
-            const data = await res.json();
-            throw new Error(data.msg || "Login failed");
+            throw new Error(data.error || data.msg || "Login failed");
         }
-        return res.json();
+        return data;
     },
 
     // USERS (STAFF)
     getUsers: async () => {
         const res = await fetch(`${API_BASE}/users`, { headers: getHeaders() });
-        return res.json();
+        const data = await safeParseJson(res);
+        if (!res.ok) throw new Error(data.error || data.msg || "Failed to fetch users");
+        return Array.isArray(data) ? data : data.users || [];
     },
 
     addUser: async (email, password, role = "staff") => {
@@ -35,8 +50,9 @@ export const api = {
             headers: getHeaders(),
             body: JSON.stringify({ email, password, role })
         });
-        if (!res.ok) throw new Error("Failed to add user");
-        return res.json();
+        const data = await safeParseJson(res);
+        if (!res.ok) throw new Error(data.error || data.msg || "Failed to add user");
+        return data;
     },
 
     updateUserStatus: async (userId, status) => {
@@ -45,13 +61,17 @@ export const api = {
             headers: getHeaders(),
             body: JSON.stringify({ status })
         });
-        return res.json();
+        const data = await safeParseJson(res);
+        if (!res.ok) throw new Error(data.error || data.msg || "Failed to update user");
+        return data;
     },
 
     // PRODUCTS
     getProducts: async () => {
         const res = await fetch(`${API_BASE}/products`);
-        return res.json();
+        const data = await safeParseJson(res);
+        if (!res.ok) throw new Error(data.error || data.msg || "Failed to fetch products");
+        return Array.isArray(data) ? data : data.products || [];
     },
 
     addProduct: async (productData) => {
@@ -60,8 +80,9 @@ export const api = {
             headers: getHeaders(),
             body: JSON.stringify(productData)
         });
-        if (!res.ok) throw new Error("Failed to add product");
-        return res.json();
+        const data = await safeParseJson(res);
+        if (!res.ok) throw new Error(data.error || data.msg || "Failed to add product");
+        return data;
     },
 
     updateProduct: async (productId, updateData) => {
@@ -70,7 +91,9 @@ export const api = {
             headers: getHeaders(),
             body: JSON.stringify(updateData)
         });
-        return res.json();
+        const data = await safeParseJson(res);
+        if (!res.ok) throw new Error(data.error || data.msg || "Failed to update product");
+        return data;
     },
 
     deleteProduct: async (productId) => {
@@ -78,13 +101,17 @@ export const api = {
             method: "DELETE",
             headers: getHeaders()
         });
-        return res.json();
+        const data = await safeParseJson(res);
+        if (!res.ok) throw new Error(data.error || data.msg || "Failed to delete product");
+        return data;
     },
 
     // ATTENDANCE
     getAttendance: async () => {
         const res = await fetch(`${API_BASE}/attendance`, { headers: getHeaders() });
-        return res.json();
+        const data = await safeParseJson(res);
+        if (!res.ok) throw new Error(data.error || data.msg || "Failed to fetch attendance");
+        return Array.isArray(data) ? data : data.attendance || [];
     },
 
     markAttendance: async (attendanceData) => {
@@ -93,6 +120,8 @@ export const api = {
             headers: getHeaders(),
             body: JSON.stringify(attendanceData)
         });
-        return res.json();
+        const data = await safeParseJson(res);
+        if (!res.ok) throw new Error(data.error || data.msg || "Failed to mark attendance");
+        return data;
     }
 };

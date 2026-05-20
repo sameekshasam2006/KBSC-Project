@@ -26,9 +26,15 @@ export default function Analytics() {
   const loadData = async () => {
     try {
       const data = await api.getProducts();
-      setProducts(data);
+      if (Array.isArray(data)) {
+        setProducts(data);
+      } else {
+        console.error("Invalid products data format:", data);
+        setProducts([]);
+      }
     } catch (err) {
-      console.error(err);
+      console.error("Error loading analytics:", err.message);
+      setProducts([]);
     }
   };
 

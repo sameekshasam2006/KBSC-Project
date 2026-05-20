@@ -56,6 +56,14 @@ with app.app_context():
         db.session.commit()
 
 # ROUTES
+@app.route('/', methods=['GET'])
+def health():
+    return jsonify({"msg": "Backend is running!"}), 200
+
+@app.route('/api', methods=['GET'])
+def api_health():
+    return jsonify({"msg": "API is ready"}), 200
+
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -113,13 +121,18 @@ def update_user(user_id):
 
 @app.route('/api/products', methods=['GET'])
 def get_products():
-    products = Product.query.all()
-    import json
-    return jsonify([{
-        "id": p.id, "name": p.name, "price": p.price, 
-        "image": p.image, "totalSold": p.total_sold,
-        "sizes": json.loads(p.sizes), "last_sold_date": p.last_sold_date
-    } for p in products])
+    try:
+        products = Product.query.all()
+        import json
+        result = [{
+            "id": p.id, "name": p.name, "price": p.price, 
+            "image": p.image, "totalSold": p.total_sold,
+            "sizes": json.loads(p.sizes), "last_sold_date": p.last_sold_date
+        } for p in products]
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"Error in get_products: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/products', methods=['POST'])
 @jwt_required()
