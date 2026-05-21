@@ -38,25 +38,41 @@ export default function Product() {
 
   const loadProducts = async () => {
     try {
+      console.log("Loading products from API...");
       const data = await api.getProducts();
-      setProducts(Array.isArray(data) ? data : []);
+      console.log("API Response:", data);
+      if (Array.isArray(data)) {
+        setProducts(data);
+        console.log("Loaded " + data.length + " products");
+      } else {
+        console.error("Invalid response format:", data);
+        setProducts([]);
+      }
     } catch (err) {
-      console.error(err);
+      console.error("Error loading products:", err);
+      alert("Failed to load products: " + (err.message || "Unknown error"));
       setProducts([]);
     }
   };
 
   const handleAdd = async (e) => {
     e.preventDefault();
-    if (!name || !price) return alert("Please fill name and price");
+    if (!name || !price || name.trim() === "" || price.trim() === "") {
+      alert("Please fill in all fields");
+      return;
+    }
     setLoading(true);
     try {
+      console.log("Adding product:", { name, price, image, sizes });
       await api.addProduct({ name, price: Number(price), image, sizes });
+      console.log("Product added successfully!");
+      alert("Product added successfully!");
       setShowAdd(false);
       resetForm();
-      loadProducts();
+      await loadProducts();
     } catch (err) {
-      alert("Error adding product");
+      console.error("Error adding product:", err);
+      alert("Error: " + (err.message || "Failed to add product"));
     } finally {
       setLoading(false);
     }
@@ -90,38 +106,52 @@ export default function Product() {
 
   const handleImage = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          const MAX_WIDTH = 800;
-          const MAX_HEIGHT = 800;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, width, height);
-          setImage(canvas.toDataURL("image/jpeg", 0.7));
-        };
-        img.src = event.target.result;
-      };
-      reader.readAsDataURL(file);
+    if (!file) {
+      console.log("No file selected");
+      return;
     }
+    if (!file.type.startsWith('image/')) {
+      alert("Please select a valid image file");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        setImage(dataUrl);
+        console.log("Image processed and set");
+      };
+      img.onerror = () => {
+        alert("Error loading image - please try another image");
+      };
+      img.src = event.target.result;
+    };
+    reader.onerror = () => {
+      alert("Error reading file - please try again");
+    };
+    reader.readAsDataURL(file);
   };
 
   const resetForm = () => {
@@ -247,14 +277,15 @@ export default function Product() {
         .s-qty { font-size: 8px; opacity: 0.6; }
         .empty-state { text-align: center; color: var(--text-muted); padding: 40px; font-size: 14px; }
         .modal-overlay { 
-          position: fixed; inset: 0; background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(12px); 
-          z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; 
+          position: fixed !important; inset: 0 !important; background: rgba(2, 6, 23, 0.95) !important; 
+          backdrop-filter: blur(12px) !important; z-index: 9999 !important; display: flex !important; 
+          align-items: center !important; justify-content: center !important; padding: 20px !important;
           animation: fadeIn 0.2s ease-in;
         }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .modal-content { 
-          width: 100%; max-width: 400px; padding: 24px; max-height: 90vh; overflow-y: auto;
-          border-radius: 20px;
+          width: 100%; max-width: 420px; padding: 24px; max-height: 90vh; overflow-y: auto;
+          border-radius: 20px; z-index: 10000 !important; position: relative !important;
         }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .modal-header h2 { font-size: 20px; color: white; }
