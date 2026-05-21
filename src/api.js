@@ -16,8 +16,8 @@ const safeParseJson = async (res) => {
         }
         return JSON.parse(text);
     } catch (e) {
-        console.error("JSON Parse Error:", e.message, "Response status:", res.status);
-        return { error: "Invalid JSON response from server" };
+        console.error("JSON Parse Error:", e.message, "Response text:", res.text, "Response status:", res.status);
+        throw new Error(`Server error (${res.status}): Invalid JSON response. ${e.message}`);
     }
 };
 

@@ -40,16 +40,18 @@ export default function Product() {
     try {
       console.log("Loading products from API...");
       const data = await api.getProducts();
-      console.log("API Response:", data);
+      console.log("✅ API Response:", data);
       if (Array.isArray(data)) {
         setProducts(data);
-        console.log("Loaded " + data.length + " products");
+        console.log("✅ Loaded " + data.length + " products successfully");
       } else {
-        console.error("Invalid response format:", data);
+        console.error("❌ Invalid response format:", data);
+        console.log("Response type:", typeof data, "Is array?", Array.isArray(data));
         setProducts([]);
       }
     } catch (err) {
-      console.error("Error loading products:", err);
+      console.error("❌ Error loading products:", err.message);
+      console.error("Full error:", err);
       alert("Failed to load products: " + (err.message || "Unknown error"));
       setProducts([]);
     }

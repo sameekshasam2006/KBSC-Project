@@ -167,11 +167,13 @@ def get_products():
         result = [{
             "id": p.id, "name": p.name, "price": p.price, 
             "image": p.image, "totalSold": p.total_sold,
-            "sizes": json.loads(p.sizes), "last_sold_date": p.last_sold_date
+            "sizes": json.loads(p.sizes), "last_sold_date": str(p.last_sold_date) if p.last_sold_date else None
         } for p in products]
+        print(f"Returning {len(result)} products")
         return jsonify(result), 200
     except Exception as e:
         print(f"Error in get_products: {str(e)}")
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/products', methods=['POST'])
