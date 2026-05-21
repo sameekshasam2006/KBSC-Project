@@ -246,21 +246,49 @@ export default function Product() {
         .s-val { font-size: 10px; font-weight: 800; }
         .s-qty { font-size: 8px; opacity: 0.6; }
         .empty-state { text-align: center; color: var(--text-muted); padding: 40px; font-size: 14px; }
-        .modal-overlay { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(12px); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .modal-content { width: 100%; maxWidth: 400px; padding: 24px; }
+        .modal-overlay { 
+          position: fixed; inset: 0; background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(12px); 
+          z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; 
+          animation: fadeIn 0.2s ease-in;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-content { 
+          width: 100%; max-width: 400px; padding: 24px; max-height: 90vh; overflow-y: auto;
+          border-radius: 20px;
+        }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .modal-header h2 { font-size: 20px; color: white; }
         .close-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; }
         .modal-form { display: flex; flex-direction: column; gap: 16px; }
-        .image-upload { height: 120px; background: rgba(255,255,255,0.02); border: 2px dashed var(--border-glass); border-radius: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; }
+        .image-upload { 
+          height: 160px; background: rgba(255,255,255,0.02); border: 2px dashed var(--border-glass); 
+          border-radius: 16px; display: flex; align-items: center; justify-content: center; 
+          cursor: pointer; overflow: hidden; transition: 0.2s;
+        }
+        .image-upload:hover { border-color: var(--primary); background: rgba(99, 102, 241, 0.05); }
         .preview-img { width: 100%; height: 100%; object-fit: cover; }
         .upload-placeholder { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--text-muted); }
         .upload-placeholder p { font-size: 12px; font-weight: 600; }
         .size-inputs-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
         .size-input-field { display: flex; flex-direction: column; gap: 4px; }
         .size-input-field label { font-size: 8px; font-weight: 700; color: var(--text-muted); text-align: center; }
-        .size-input-field input { padding: 8px; font-size: 12px; text-align: center; }
+        .size-input-field input { 
+          padding: 8px; font-size: 12px; text-align: center; 
+          background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass);
+          border-radius: 8px; color: white;
+        }
+        .size-input-field input:focus { outline: none; border-color: var(--primary); background: rgba(99, 102, 241, 0.1); }
         .finalize-btn { width: 100%; margin-top: 8px; height: 50px; }
+        .form-group { display: flex; flex-direction: column; gap: 8px; }
+        .form-group input { 
+          padding: 12px; font-size: 14px;
+          background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass);
+          border-radius: 8px; color: white;
+        }
+        .form-group input:focus { outline: none; border-color: var(--primary); background: rgba(99, 102, 241, 0.1); }
+        .form-group input::placeholder { color: var(--text-muted); }
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
     </div>
   );

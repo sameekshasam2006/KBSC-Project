@@ -73,7 +73,7 @@ function Dashboard() {
           <div className="avatar-box"><User size={18} /></div>
           <div className="user-text">
             <h2 className="user-name">{email?.split('@')[0]}</h2>
-            <p className="user-role-badge">{role?.toUpperCase()} • RETAILIQ</p>
+            <p className="user-role-badge">KBSC • {role?.toUpperCase()}</p>
           </div>
         </div>
         <div className="header-actions">
