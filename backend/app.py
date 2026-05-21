@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
@@ -7,22 +7,57 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, ge
 from datetime import datetime, timedelta
 import json
 
-app = Flask(__name__)
+# Get the parent directory where dist/ is located
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DIST_DIR = os.path.join(BASE_DIR, 'dist')
+
+# Create Flask app with static folder config
+app = Flask(__name__, 
+    static_folder=os.path.join(DIST_DIR) if os.path.exists(DIST_DIR) else None,
+    static_url_path='')
 CORS(app)
 
 # CONFIGURATION
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///kbsc.db'
+INSTANCE_DIR = os.path.join(BASE_DIR, 'instance')
+os.makedirs(INSTANCE_DIR, exist_ok=True)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(INSTANCE_DIR, "kbsc.db")}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = 'kbsc-luxury-secret-key' # Change in production
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET', 'kbsc-luxury-secret-key')  # Use env var in production
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
 
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 
-# ERROR HANDLERS - Always return JSON
+# Serve static files from dist
+@app.route('/<path:path>')
+def serve_static(path):
+    """Serve static files from dist folder"""
+    dist_path = os.path.join(DIST_DIR, path) if os.path.exists(DIST_DIR) else None
+    if dist_path and os.path.isfile(dist_path):
+        return send_from_directory(DIST_DIR, path)
+    # Serve index.html for SPA routing
+    if os.path.exists(os.path.join(DIST_DIR, 'index.html')):
+        return send_from_directory(DIST_DIR, 'index.html')
+    return jsonify({"error": "File not found"}), 404
+
+@app.route('/')
+def serve_index():
+    """Serve the React app"""
+    if os.path.exists(os.path.join(DIST_DIR, 'index.html')):
+        return send_from_directory(DIST_DIR, 'index.html')
+    return jsonify({"msg": "KBSC RetailIQ Backend - Build the frontend with 'npm run build'"}), 200
+
+# ERROR HANDLERS - Always return JSON for API calls
 @app.errorhandler(404)
 def not_found(e):
+    # If it's an API call, return JSON error
+    if request.path.startswith('/api'):
+        return jsonify({"error": "Endpoint not found"}), 404
+    # Otherwise try to serve index.html for SPA routing
+    if os.path.exists(os.path.join(DIST_DIR, 'index.html')):
+        return send_from_directory(DIST_DIR, 'index.html')
     return jsonify({"error": "Endpoint not found"}), 404
 
 @app.errorhandler(500)
@@ -265,4 +300,6 @@ def mark_attendance():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    debug_mode = os.environ.get('FLASK_ENV', 'production') == 'development'
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=debug_mode, host='0.0.0.0', port=port)
