@@ -31,37 +31,39 @@ bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 
 # Serve static files from dist
-@app.route('/<path:path>')
-def serve_static(path):
-    """Serve static files from dist folder"""
-    dist_path = os.path.join(DIST_DIR, path) if os.path.exists(DIST_DIR) else None
-    if dist_path and os.path.isfile(dist_path):
-        return send_from_directory(DIST_DIR, path)
-    # Serve index.html for SPA routing
-    if os.path.exists(os.path.join(DIST_DIR, 'index.html')):
-        return send_from_directory(DIST_DIR, 'index.html')
-    return jsonify({"error": "File not found"}), 404
-
 @app.route('/')
-def serve_index():
-    """Serve the React app"""
-    if os.path.exists(os.path.join(DIST_DIR, 'index.html')):
+@app.route('/<path:path>')
+def serve_app(path='index.html'):
+    """Serve the React app and static files"""
+    if not os.path.exists(DIST_DIR):
+        return jsonify({"error": "Frontend not built. Please run 'npm run build'"}), 500
+    
+    # Check if the requested path is a file
+    requested_file = os.path.join(DIST_DIR, path)
+    if os.path.isfile(requested_file):
+        return send_from_directory(DIST_DIR, path)
+    
+    # For any route not found, serve index.html (SPA routing)
+    index_path = os.path.join(DIST_DIR, 'index.html')
+    if os.path.isfile(index_path):
         return send_from_directory(DIST_DIR, 'index.html')
-    return jsonify({"msg": "KBSC RetailIQ Backend - Build the frontend with 'npm run build'"}), 200
+    
+    return jsonify({"error": "Frontend files not found"}), 500
 
 # ERROR HANDLERS - Always return JSON for API calls
 @app.errorhandler(404)
 def not_found(e):
     # If it's an API call, return JSON error
     if request.path.startswith('/api'):
-        return jsonify({"error": "Endpoint not found"}), 404
-    # Otherwise try to serve index.html for SPA routing
+        return jsonify({"error": "API endpoint not found"}), 404
+    # Otherwise serve the React app for SPA routing
     if os.path.exists(os.path.join(DIST_DIR, 'index.html')):
-        return send_from_directory(DIST_DIR, 'index.html')
-    return jsonify({"error": "Endpoint not found"}), 404
+        return send_from_directory(DIST_DIR, 'index.html'), 200
+    return jsonify({"error": "Frontend not found"}), 500
 
 @app.errorhandler(500)
 def server_error(e):
+    print(f"Server error: {str(e)}")
     return jsonify({"error": "Internal server error"}), 500
 
 @app.errorhandler(Exception)
